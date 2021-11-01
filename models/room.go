@@ -1,28 +1,42 @@
 package models
 
-import (
-	"fmt"
-)
+import "log"
 
 type Room struct {
 	Name     string
 	sessions map[Session]bool
 
-	broadcast chan []byte
+	broadcast  chan *Message
+	register   chan *Session
+	unregister chan *Session
 }
 
-func NewRoom(Name string, CreatorSession Session) *Room {
-
+func NewRoom(m *Message, CreatorSession *Session) *Room {
 	r := Room{
-		Name:      Name,
-		sessions:  make(map[Session]bool),
-		broadcast: make(chan []byte),
+		Name:       m.Room,
+		sessions:   make(map[Session]bool),
+		broadcast:  make(chan *Message),
+		register:   make(chan *Session),
+		unregister: make(chan *Session),
 	}
-	r.AddSession(CreatorSession)
+	r.sessions[*CreatorSession] = true
+	log.Printf("%v created %v room.", m.User, r.Name)
+	go r.Start()
 	return &r
 }
 
-func (r *Room) AddSession(session Session) {
-	r.sessions[session] = true
-	r.broadcast <- []byte(fmt.Sprintf("%v connected to %v", session.User.Name, r.Name))
+func (r *Room) Start() {
+	for {
+		select {
+		case session := <-r.register:
+			r.sessions[*session] = true
+		case session := <-r.unregister:
+			r.sessions[*session] = false
+		case message := <-r.broadcast:
+			for session, _ := range r.sessions {
+				session.Ws.WriteJSON(message)
+			}
+		}
+	}
+
 }

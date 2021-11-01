@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/gorilla/websocket"
 	"go_chat/models"
@@ -34,41 +33,10 @@ func WsHandler(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		log.Println(err)
 	}
-	log.Println("Client connected")
-	reader(ws)
-}
-
-func reader(con *websocket.Conn) {
-	for {
-		messageType, p, err := con.ReadMessage()
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		fmt.Println(string(p))
-		message := models.Message{}
-		err = json.Unmarshal(p, &message)
-		if err != nil {
-			log.Println("Cannot unmarshal message")
-		}
-
-		newSession := models.Session{
-			User: &models.User{Name: message.User},
-			Ws:   con,
-			Hub:  Hub,
-		}
-		Sessions[&newSession] = true
-
-		switch message.Kind {
-		case "Join":
-			Hub.JoinRoom(message, newSession)
-		default:
-			log.Println("Unknown message kind")
-		}
-
-		if err := con.WriteMessage(messageType, p); err != nil {
-			log.Println(err)
-			return
-		}
+	newSession := models.Session{
+		Ws:  ws,
+		Hub: Hub,
 	}
+	Sessions[&newSession] = true
+	go newSession.Run()
 }
