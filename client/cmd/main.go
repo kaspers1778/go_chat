@@ -23,15 +23,23 @@ func main() {
 		User: "Vasya",
 		Kind: "Join",
 		Text: "has joined the room.",
-		Room: "Second",
+		Room: "First",
+	})
+	time.Sleep(1 * time.Second)
+	me.Write(models.Message{
+		User: "Petro",
+		Kind: "Leave",
+		Text: "has leave the room.",
+		Room: "First",
 	})
 	time.Sleep(1 * time.Second)
 	not_me.Write(models.Message{
 		User: "Vasya",
 		Kind: "Text",
 		Text: "Hey, Pete)",
-		Room: "Second",
+		Room: "First",
 	})
+	time.Sleep(1 * time.Second)
 
 	fmt.Scanln()
 

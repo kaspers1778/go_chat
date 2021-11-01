@@ -33,8 +33,10 @@ func (r *Room) Start() {
 		case session := <-r.unregister:
 			r.sessions[*session] = false
 		case message := <-r.broadcast:
-			for session, _ := range r.sessions {
-				session.Ws.WriteJSON(message)
+			for session, status := range r.sessions {
+				if status {
+					session.Ws.WriteJSON(message)
+				}
 			}
 		}
 	}

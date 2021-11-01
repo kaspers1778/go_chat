@@ -21,6 +21,8 @@ func (h *Hub) RouteMessage(message *Message, session *Session) {
 		h.JoinRoom(message, session)
 	case "Text":
 		h.SendMessage(message)
+	case "Leave":
+		h.LeaveRoom(message, session)
 	default:
 		log.Println("Unknown message kind")
 	}
@@ -36,5 +38,10 @@ func (h *Hub) JoinRoom(message *Message, session *Session) {
 }
 
 func (h *Hub) SendMessage(message *Message) {
+	h.Rooms[message.Room].broadcast <- message
+}
+
+func (h *Hub) LeaveRoom(message *Message, session *Session) {
+	h.Rooms[message.Room].unregister <- session
 	h.Rooms[message.Room].broadcast <- message
 }
