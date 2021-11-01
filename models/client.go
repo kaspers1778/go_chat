@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/gorilla/websocket"
 	"log"
@@ -11,9 +10,9 @@ import (
 
 type Client struct {
 	Name    string
-	wsconn  *websocket.Conn
+	Wsconn  *websocket.Conn
 	mutex   sync.Mutex
-	sendBuf chan []byte
+	sendBuf chan Message
 	link    string
 }
 
@@ -21,7 +20,7 @@ func NewChatUser(name string, link string) (*Client, error) {
 	newUser := Client{
 		Name:    name,
 		link:    link,
-		sendBuf: make(chan []byte, 1),
+		sendBuf: make(chan Message, 1),
 	}
 	go newUser.listen()
 	go newUser.listenWrite()
@@ -32,8 +31,8 @@ func NewChatUser(name string, link string) (*Client, error) {
 func (cl *Client) Connect() *websocket.Conn {
 	cl.mutex.Lock()
 	defer cl.mutex.Unlock()
-	if cl.wsconn != nil {
-		return cl.wsconn
+	if cl.Wsconn != nil {
+		return cl.Wsconn
 	}
 
 	ticker := time.NewTicker(time.Second * 1)
@@ -43,9 +42,9 @@ func (cl *Client) Connect() *websocket.Conn {
 		if err != nil {
 			continue
 		}
-		cl.wsconn = ws
+		cl.Wsconn = ws
 		log.Println("Client connected.")
-		return cl.wsconn
+		return cl.Wsconn
 	}
 }
 
@@ -57,24 +56,21 @@ func (cl *Client) listen() {
 		if ws == nil {
 			continue
 		}
+		message := &Message{}
 		for {
-			_, byteMsg, err := ws.ReadMessage()
+			err := ws.ReadJSON(message)
 			if err != nil {
 				cl.Stop()
 				break
 			}
-			fmt.Println(string(byteMsg))
+			fmt.Printf("(%v got message in %v) %v:%v\n",
+				cl.Name, message.Room, message.User, message.Text)
 		}
 	}
 }
 
-func (cl *Client) Write(payload interface{}) error {
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-
-	cl.sendBuf <- data
+func (cl *Client) Write(payload Message) error {
+	cl.sendBuf <- payload
 	return nil
 
 }
@@ -87,7 +83,7 @@ func (cl *Client) listenWrite() {
 			continue
 		}
 		data := <-cl.sendBuf
-		err := ws.WriteMessage(websocket.TextMessage, data)
+		err := ws.WriteJSON(data)
 		if err != nil {
 			log.Println("Write message error")
 		}
@@ -96,9 +92,9 @@ func (cl *Client) listenWrite() {
 }
 
 func (cl *Client) Stop() {
-	if cl.wsconn != nil {
-		cl.wsconn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-		cl.wsconn.Close()
-		cl.wsconn = nil
+	if cl.Wsconn != nil {
+		cl.Wsconn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+		cl.Wsconn.Close()
+		cl.Wsconn = nil
 	}
 }
