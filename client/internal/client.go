@@ -1,4 +1,4 @@
-package models
+package internal
 
 import (
 	"fmt"
@@ -13,19 +13,20 @@ type Client struct {
 	Wsconn  *websocket.Conn
 	mutex   sync.Mutex
 	sendBuf chan Message
+	getBuf  chan *Message
 	link    string
 }
 
-func NewChatUser(name string, link string) (*Client, error) {
+func NewChatUser(name string, link string, getBuf *chan *Message) (*Client, error) {
 	newUser := Client{
 		Name:    name,
 		link:    link,
 		sendBuf: make(chan Message, 1),
+		getBuf:  *getBuf,
 	}
 	go newUser.listen()
 	go newUser.listenWrite()
 	return &newUser, nil
-
 }
 
 func (cl *Client) Connect() *websocket.Conn {
@@ -43,7 +44,7 @@ func (cl *Client) Connect() *websocket.Conn {
 			continue
 		}
 		cl.Wsconn = ws
-		log.Println("Client connected.")
+		//log.Println("Client connected.")
 		return cl.Wsconn
 	}
 }
@@ -63,8 +64,8 @@ func (cl *Client) listen() {
 				cl.Stop()
 				break
 			}
-			fmt.Printf("(%v got message in %v) %v:%v\n",
-				cl.Name, message.Room, message.User, message.Text)
+			cl.getBuf <- message
+			fmt.Println(message)
 		}
 	}
 }
@@ -87,7 +88,7 @@ func (cl *Client) listenWrite() {
 		if err != nil {
 			log.Println("Write message error")
 		}
-		log.Printf("Sended: %s", data)
+		//log.Printf("Sended: %s", data)
 	}
 }
 
@@ -96,5 +97,38 @@ func (cl *Client) Stop() {
 		cl.Wsconn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 		cl.Wsconn.Close()
 		cl.Wsconn = nil
+	}
+}
+
+func (cl *Client) WriteTextMessage(text string, room string) {
+	if err := cl.Write(Message{
+		User: cl.Name,
+		Kind: "Text",
+		Text: text,
+		Room: room,
+	}); err != nil {
+		log.Print("Message has not been sent")
+	}
+}
+
+func (cl *Client) WriteJoinMessage(room string) {
+	if err := cl.Write(Message{
+		User: cl.Name,
+		Kind: "Join",
+		Text: "New user",
+		Room: room,
+	}); err != nil {
+		log.Print("Message has not been sent")
+	}
+}
+
+func (cl *Client) WriteLeaveMessage(room string) {
+	if err := cl.Write(Message{
+		User: cl.Name,
+		Kind: "Leave",
+		Text: "is gone",
+		Room: room,
+	}); err != nil {
+		log.Print("Message has not been sent")
 	}
 }

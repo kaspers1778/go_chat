@@ -1,4 +1,4 @@
-package models
+package internal
 
 type Message struct {
 	User string
